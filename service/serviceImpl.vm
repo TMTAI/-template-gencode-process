@@ -1,0 +1,427 @@
+#parse("/include/packages_variables.vm")
+#parse("/include/init_var_entity.vm")
+#parse("/include/java_header.vm")
+
+#set( $uncapitalizedEntityName = $fn.uncapitalize($entity.name) )
+#set( $serviceName = "${entity.name}Service"	)
+#set( $dtoSearchName = "${entity.name}SearchDto"	)
+#set( $serviceImplName = "${entity.name}ServiceImpl"	)
+#set( $repositoryName = "${entity.name}Repository"	)
+#set( $enumSearchName = "${entity.name}SearchEnum"	)
+#set( $enumExportName = "${entity.name}ExportEnum"	)
+#set( $searchResultDtoName = "${entity.name}SearchResultDto")
+#set( $editDtoName = "${entity.name}EditDto")
+#set( $uncapitalizedRepoName = $fn.uncapitalize($repositoryName) )
+
+#set( $dataFields = $entity.getAttributesByCriteria( $const.NOT_KEY, $const.NOT_IN_SELECTED_LINKS ) )
+package ${target.javaPackageFromFolder($SRC)};
+
+import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.servlet.ServletContext;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import vn.com.unit.jcanary.config.SystemConfig;
+import vn.com.unit.exception.BusinessException;
+import vn.com.unit.jcanary.authentication.UserProfileUtils;
+import vn.com.unit.jcanary.common.PageWrapper;
+import vn.com.unit.jcanary.constant.BusinessConstant;
+import vn.com.unit.jcanary.constant.CommonConstant;
+import vn.com.unit.jcanary.constant.StepNoStatusConstant;
+import vn.com.unit.jcanary.dto.AccountItem;
+import vn.com.unit.jcanary.entity.Account;
+import vn.com.unit.jcanary.entity.JProcess;
+import vn.com.unit.jcanary.entity.Step;
+import vn.com.unit.jcanary.repository.AccountRepository;
+import vn.com.unit.jcanary.service.AccountService;
+import vn.com.unit.jcanary.repository.JProcessRepository;
+import vn.com.unit.jcanary.repository.JStepRepository;
+import vn.com.unit.jcanary.service.ApprovalModuleService;
+import vn.com.unit.jcanary.service.JHistoryApproveService;
+import vn.com.unit.jcanary.service.JProcessService;
+import vn.com.unit.jcanary.utils.ExportExcelUtil;
+import vn.com.unit.jcanary.utils.ImportExcelUtil;
+import vn.com.unit.dto.ItemColsExcelDto;
+
+import vn.com.unit.ep2p.constant.ExcelConst;
+import vn.com.unit.ep2p.repository.P2pProcessUserRelatedRepository;
+
+//--- Entities
+import ${entityPackage}.${entity.name};
+import vn.com.unit.ep2p.entity.P2pProcessUserRelated;
+
+//--- Service 
+import ${servicePackage}.${serviceName};
+
+//-- DTO
+import ${dtoPackage}.${dtoSearchName};
+import ${dtoPackage}.${searchResultDtoName};
+import ${dtoPackage}.${editDtoName};
+
+//-- Repository
+import ${entityRepository}.${repositoryName};
+
+//-- Enum Search
+import ${enumPackage}.${enumExportName};
+
+/**
+ * Spring MVC ServiceImpl for '${entity.name}' management.
+ */
+
+@Service
+@Transactional(readOnly = true, rollbackFor = Exception.class)
+public class ${serviceImplName} extends ApprovalModuleServiceAbstract<${editDtoName}> 
+		implements ${serviceName}{
+
+	@Autowired
+    private ${repositoryName} ${uncapitalizedRepoName};
+    
+    @Autowired
+    private SystemConfig systemConfig;
+
+	@Autowired
+	private ServletContext servletContext;
+
+    @Autowired
+    private AccountService accountService;
+
+	@Autowired
+	private ApprovalModuleService<${editDtoName}> approvalModuleService;
+
+	@Autowired
+	private JProcessService jProcessService;
+
+	@Autowired
+	private JProcessRepository jProcessRepository;
+
+	@Autowired
+	private JHistoryApproveService jHistoryApproveService;
+
+	@Autowired
+	private JStepRepository jStepRepository;
+
+	@Autowired
+	private AccountRepository accountRepository;
+
+    @Autowired
+    private P2pProcessUserRelatedRepository p2pProcessUserRelatedRepository;
+
+	private static final Logger logger = LoggerFactory.getLogger(${serviceImplName}.class);	
+
+	private static final String BUSINESS_PROCESS  = ""; //BusinessConstant.ASSET_ADJUSTMENT_PROCESS;
+
+	/**
+	 * Shows a list with all the occurrences of ${entity.name} found in the database
+	 * @param model Spring MVC model
+	 * @return
+	 */
+
+	@Override
+    public PageWrapper<${searchResultDtoName}> doSearch(int page, ${dtoSearchName} searchDto, int pageSize) {
+
+        PageWrapper<${searchResultDtoName}> pageWrapper = new PageWrapper<${searchResultDtoName}>();
+
+		int sizeOfPage = systemConfig.settingPageSizeList(pageSize, pageWrapper, page);
+
+        int count = ${uncapitalizedRepoName}.count${searchResultDtoName}ByCondition(searchDto);
+
+        List<${searchResultDtoName}> result = new ArrayList<${searchResultDtoName}>();
+
+        if (count > 0) {
+            int currentPage = pageWrapper.getCurrentPage();
+            int startIndex = (currentPage - 1) * sizeOfPage;
+            result = ${uncapitalizedRepoName}.findAll${searchResultDtoName}ByCondition(startIndex, sizeOfPage, searchDto);
+        }
+
+        pageWrapper.setDataAndCount(result, count);
+
+        return pageWrapper;
+    }
+
+	@Override
+	public ${editDtoName} get${editDtoName}ById(Long id, Locale locale){
+		${editDtoName} editDto = new ${editDtoName}();
+
+        if(null != id) {
+        	editDto = ${uncapitalizedRepoName}.find${editDtoName}ById(id, locale.toString());
+        }
+
+        return editDto;
+	}
+
+	@Override
+	@Transactional(readOnly = true, rollbackFor = Exception.class)
+	public void saveOrUpdate(${editDtoName} editDto, boolean actionSubmit,
+			HttpServletRequest httpServletRequest, Locale locale) throws Exception{
+
+		doSaveData(editDto, actionSubmit, locale);
+
+		// if action submit
+		if (actionSubmit) {
+
+			Step currentStep = editDto.getCurrentStep();
+			// create user related
+			createProcessUserRelated(editDto, currentStep.getStepNo(), currentStep.getStatus(),
+					editDto.getOldStepNo(),
+					accountRepository.findByUserName(UserProfileUtils.getUserNameLogin()));
+
+			sendMailProcess(editDto, editDto.getStepNo(), null, StepNoStatusConstant.STEP_DRAFT,
+					accountRepository.findByUserName(UserProfileUtils.getUserNameLogin()), httpServletRequest, locale);
+		}
+	}
+
+	private void doSaveData(${editDtoName} editDto, boolean actionSubmit, Locale locale) throws Exception{
+		String userNameLogin = UserProfileUtils.getUserNameLogin();
+
+        Long id = editDto.getId();
+		
+		${entity.name} entity = new ${entity.name}();
+        
+		if(null != id) {
+			//update data
+        	entity = ${uncapitalizedRepoName}.findOne(id);
+            
+			if(null == entity) {
+                throw new BusinessException( "Not found ${editDtoName} by id= " + id);
+            }
+
+            entity.setUpdatedBy(userNameLogin);
+            entity.setUpdatedDate(new Date());
+
+        }else{
+			//create data
+        	entity.setCreatedBy(userNameLogin);
+        	entity.setCreatedDate(new Date());
+        }
+
+		updateData(entity, editDto);
+
+		${uncapitalizedRepoName}.save(entity);
+
+		// if submit
+		if (actionSubmit) {
+			editDto.setOldStepNo(editDto.getStepNo());
+
+			// set process id if null or get current processId
+			JProcess jProcess = null;
+			Long processId = editDto.getProcessId();
+
+			if (processId == null) {
+				jProcess = jProcessService
+						.findActiveProcessByBusinessCodeAndDate(BUSINESS_PROCESS, new Date());
+				if (jProcess == null) {
+					throw new Exception("PROCESS NOT FOUND");
+				}
+				processId = jProcess.getId();
+				// set process id
+				editDto.setProcessId(jProcess.getId());
+				// set BusinessCode
+				editDto.setBusinessCode(BUSINESS_PROCESS);
+			} else {
+				jProcess = jProcessRepository.findOne(entity.getProcessId());
+			}
+
+			// find next step
+			Integer nextStep = approvalModuleService.findNextStepDraftReturnReject(processId, entity.getId(),
+					editDto.getStepNo());
+			ObjectMapper objectMapper = new ObjectMapper();
+			nextStep = processStepAuto(nextStep, processId, objectMapper.convertValue(editDto, Map.class),
+					BUSINESS_PROCESS);
+			if (nextStep == null) {
+				throw new Exception("Cant find next step no");
+			}
+
+			// save history
+			List<Step> lstStep = jStepRepository.findStepByCondition(nextStep, processId);
+			Step currentStep = lstStep.get(0);
+			editDto.setCurrentStep(currentStep);
+			editDto.setStepNo(nextStep);
+
+			// Save history submit
+			jHistoryApproveService.saveHistorySubmit(jProcess, entity.getId(), editDto.getComments(), lstStep.get(0),
+					editDto.getOldStepNo());
+
+			entity.setStepNo(nextStep);
+			entity.setProcessId(editDto.getProcessId());
+			entity.setProcessStatusCode(lstStep.get(0).getStatus());
+			
+			${uncapitalizedRepoName}.save(entity);
+		}
+		
+        if (editDto.getId() == null) {
+            editDto.setId(entity.getId());
+
+            editDto.setCreatedDate(entity.getCreatedDate());
+            editDto.setCreatedBy(entity.getCreatedBy());
+        }
+	}
+
+	@Override
+	@Transactional(readOnly = true, rollbackFor = Exception.class)
+	public void deleteItem(Long id){
+		String usernameLogin = UserProfileUtils.getUserNameLogin();
+		Date systemDate = new Date();
+		if(null != id) {
+			${entity.name} entity = ${uncapitalizedRepoName}.findOne(id);
+			entity.setDeletedDate(systemDate);
+			entity.setDeletedBy(usernameLogin);
+			entity.setDeleteFlag(1);
+
+			${uncapitalizedRepoName}.save(entity);
+		}
+	}
+
+	@Override
+    public void exportExcel(${dtoSearchName} searchDto, HttpServletResponse res, Locale locale) {
+        try {
+			/*change template*/
+            String templateName = ExcelConst.TEMPLATE_EXPORT_INIT;
+            String template = servletContext.getRealPath(CommonConstant.REAL_PATH_TEMPLATE_EXCEL) + "/" + templateName
+                    + CommonConstant.TYPE_EXCEL;
+
+            String datePattern = systemConfig.getConfig(SystemConfig.DATE_PATTERN);
+
+            List<${editDtoName}> lstData = ${uncapitalizedRepoName}.exportExcelWithCondition(searchDto);
+            List<ItemColsExcelDto> cols = new ArrayList<>();
+
+            // start fill data to workbook
+            ImportExcelUtil.setListColumnExcel(${enumExportName}.class, cols);
+            ExportExcelUtil<${editDtoName}> exportExcel = new ExportExcelUtil<>();
+
+            // do export
+            exportExcel.exportExcelWithXSSFNonPass(template, locale, lstData, ${editDtoName}.class, cols, datePattern, res, templateName);
+
+        } catch (Exception e) {
+           logger.error("exportExcel", e.getMessage());
+        }
+    }
+
+	@Override
+	public List<${editDtoName}> getAll${editDtoName}(){
+		return ${uncapitalizedRepoName}.findAll${editDtoName}();
+	}
+
+	//only update field want to update 
+	public void updateData(${entity.name} source, ${editDtoName} target){
+#foreach( $field in $dataFields )
+#if($field.formattedName(0) != 'deletedBy' && $field.formattedName(0) != 'deletedDate' && $field.formattedName(0) != 'createdBy'
+&& $field.formattedName(0) != 'createdDate' && $field.formattedName(0) != 'updatedDate' && $field.formattedName(0) != 'updatedBy'
+&& $field.formattedName(0) != 'deleteFlag' && $field.formattedName(0) != 'companyCode')
+		source.${field.setter}(target.${field.getter}());
+#end
+#end
+	}
+
+    @Override
+    public void doApprovalService(${editDtoName} objectDto, Long referenceId,
+            HttpServletRequest httpServletRequest, Locale locale, Account accountAction) throws Exception {
+		super.doApproval(objectDto, referenceId, httpServletRequest, locale, accountAction);
+    }
+
+    @Override
+    protected void preProcess(${editDtoName} object, Long referenceId, HttpServletRequest httpServletRequest,
+            Locale locale, Account accountAction) throws Exception {
+
+    }
+
+    @Override
+    protected void doActionBusiness(${editDtoName} object, boolean statusCondition, Integer nextStatus,
+            HttpServletRequest httpServletRequest, Locale locale, Account accountAction) throws Exception {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    protected void setIsPartial(Step stepCurrent, ${editDtoName} object) {
+
+    }
+
+    @Override
+    protected boolean createProcessUserRelated(${editDtoName} objectData, Integer nextStepNo,
+            String nextStatusCode, Integer curStepNo, Account accountAction) throws Exception {
+        Long processId = objectData.getProcessId();
+        Long referenceId = objectData.getId();
+        
+        // deactive old
+        p2pProcessUserRelatedRepository.deactiveCurrentStepNoOfUserByCondition(curStepNo, processId, referenceId, accountAction.getUsername());
+        p2pProcessUserRelatedRepository.deactiveCurrentStepNoByCondition(curStepNo, processId, referenceId);
+        
+        Integer prevStepNo = curStepNo; // stepNo current
+
+        if (!nextStepNo.equals(StepNoStatusConstant.STEP_APPROVED)
+                && !nextStepNo.equals(StepNoStatusConstant.STEP_CANCEL)) {
+            if (nextStepNo.equals(StepNoStatusConstant.STEP_REJECTED)) { // luu them trang thai reject
+                saveProcessUserRelated(objectData, accountAction, prevStepNo, nextStepNo, referenceId, 1);
+            } else {
+                List<String> itemList = jProcessService.findItemList(processId, nextStepNo);
+                if (itemList != null && !itemList.isEmpty()) {
+                    List<AccountItem> accountList = new ArrayList<AccountItem>();
+                    accountList = accountService.findListAccountItemByItemList(itemList);
+
+                    if (accountList == null || accountList.isEmpty()) {
+                        throw new Exception("Approver for next step is missing. Please contact to administrator");
+                    } else {
+                        accountList.forEach(item -> saveUserRelated(objectData, item, accountAction, prevStepNo,
+                                nextStepNo, referenceId));
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private void saveProcessUserRelated(${editDtoName} objectData, Account accountAction, Integer prevStepNo,
+            Integer currentStepNo, Long referenceId, Integer active) {
+        Account account = accountService.findByUserName(objectData.getCreatedBy());
+        
+        P2pProcessUserRelated p2pProcessUserRelated = new P2pProcessUserRelated();
+        p2pProcessUserRelated.setActive(active);
+        p2pProcessUserRelated.setCreatedBy(accountAction.getUsername());
+        p2pProcessUserRelated.setCreatedDate(new Date());
+        p2pProcessUserRelated.setCurrentStepNo(currentStepNo);
+        p2pProcessUserRelated.setCurStepFullName(account.getFullname());
+        p2pProcessUserRelated.setCurStepUsername(account.getUsername());
+        p2pProcessUserRelated.setPrevStepNo(prevStepNo);
+        p2pProcessUserRelated.setTransactionNo(getTransactionNo(objectData));
+        p2pProcessUserRelated.setTransactionType(objectData.getBusinessCode());
+        p2pProcessUserRelated.setProcessId(objectData.getProcessId());
+        p2pProcessUserRelated.setReferenceId(referenceId);
+        p2pProcessUserRelated
+                .setUrl(BusinessConstant.getMapUrlByBusinessCode(objectData.getBusinessCode()) + referenceId);
+        p2pProcessUserRelated.setPrevStepFullName(accountAction.getFullname());
+        p2pProcessUserRelated.setPrevStepUsername(accountAction.getUsername());
+        p2pProcessUserRelatedRepository.save(p2pProcessUserRelated);
+    }
+
+    @Override
+    protected void sendMailProcess(${editDtoName} abstractProcessDto, Integer nextStepNo,
+            String nextStatusCode, Integer curStepNo, Account accountAction, HttpServletRequest httpServletRequest,
+            Locale locale) throws Exception {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    protected List<String> getListDepartment(${editDtoName} objectData) {
+        return null;
+    }
+
+    @Override
+    protected String getTransactionNo(${editDtoName} objectData) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+}

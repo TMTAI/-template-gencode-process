@@ -1,0 +1,109 @@
+#set( $nameLC = ${entity.name.toLowerCase()} )
+
+${DOLLAR}(function(){
+	//on click cancel
+	${DOLLAR}('#cancel').on('click', function (event) {
+		event.preventDefault();
+		var url = BASE_URL + "$nameLC/list";
+		
+		// Redirect to page list
+		ajaxRedirect(url);
+	});
+	
+	//on click list
+	${DOLLAR}('#linkList').on('click', function (event) {
+		event.preventDefault();
+		var url = BASE_URL + "${nameLC}/list";
+
+		// Redirect to page list
+		ajaxRedirect(url);
+	});
+	
+	// on click add
+	${DOLLAR}("#add").on("click", function(event) {
+		var url = BASE_URL + "${nameLC}/edit";
+		// Redirect to page add
+		ajaxRedirect(url);
+	});
+
+	// save draft
+	$("#button-approval-module-save-draft-id").on("click", function(event) {
+		var url = "${nameLC}/edit";
+		doSave(url);
+	});
+	
+	$('#button-approval-module-submit-id').click(function(e){
+		var url = "${nameLC}/submit";
+
+		if (!validateForSave()){
+			doSave(url);
+		}
+	});
+
+	initData();
+});
+
+function initData(){
+
+}
+
+function validateForSave(){
+	var error = false;
+	
+	var messError = "";
+
+	if (messError != "") {
+		goTopPage();
+		return true;
+	}
+
+	return error;
+}
+
+function addMessageError(error) {
+	$(".alert-dismissible").remove();
+	$("#message-list").append('<div class="alert alert-danger alert-dismissible">'
+			+' <button aria-hidden="true" data-dismiss="alert" class="close" type="button">×</button>'
+			+ '<h4>Error</h4>' 
+			+'<div>' + error +'</div></div>');
+}
+
+function doSave(url){
+	if (${DOLLAR}(".j-form-validate").valid()) {
+		// remove all disabled
+		${DOLLAR}('input:disabled, select:disabled, textarea:disabled').removeAttr('disabled');
+		
+		${DOLLAR}("#commentsId").val(${DOLLAR}("#widgetApprovalComment").val());
+		
+	    var condition = ${DOLLAR}("#form-edit").serializeArray();
+	    
+	    ajaxSubmit(url, $.param(condition), event);
+	    
+	    ${DOLLAR}("#message-list").html('');
+	} else {
+		setTimeout(function() {
+			${DOLLAR}(".j-form-validate").find(":input.error:first").focus();
+		}, 500);
+	}
+}
+
+/**
+ * Set param for form
+ * @returns
+ */
+function setParamForForm(e) {
+	// validate GUI
+	if (${DOLLAR}(".j-form-validate").valid()) {
+		// remove all disabled
+		${DOLLAR}('input:disabled, select:disabled, textarea:disabled').removeAttr('disabled');
+		
+	} else {
+		setTimeout(function() {
+			${DOLLAR}(".j-form-validate").find(":input.error:first").focus();
+		}, 500);
+		
+		return false;
+	}
+	
+	return true;
+}
